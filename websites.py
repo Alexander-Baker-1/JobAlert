@@ -33,25 +33,69 @@ class Indeed(Website):
         }
     
     def search(self, keyword, location):
-        # Build URL and make request
         time.sleep(2)
         params = {'q': keyword, 'l': location}
         response = requests.get(self.base_url, params=params, headers=self.headers)
         
-        # DEBUG: Check if request worked
-        print(response.status_code)
-        
         soup = BeautifulSoup(response.content, 'html.parser')
+        jobs = soup.find_all('div', class_='job_seen_beacon')
         
-        # DEBUG: See the HTML structure
-        # print(soup.prettify())
+        job_listings = []
+        for job in jobs:
+            job_data = self.parse_job(job, keyword, location)
+            job_listings.append(job_data)
         
-        # TODO: Find job elements and return them
-        return []
+        return job_listings
     
-    def parse_job(self, job_element):
-        # Indeed-specific parsing
-        pass
+    def parse_job(self, job_element, keyword, location):
+        # Initialize defaults
+        title = 'No title'
+        company = 'No company'
+        location_text = 'No location'
+        salary = 'No salary listed'
+        job_url = 'No URL'
+        
+        # Extract job title
+        title_span = job_element.find('span', title=True)
+        if title_span:
+            title = title_span.get('title')
+        
+        # Extract company
+        company_span = job_element.find('span', {'data-testid': 'company-name'})
+        if company_span:
+            company = company_span.text.strip()
+        
+        # Extract location
+        location_div = job_element.find('div', {'data-testid': 'text-location'})
+        if location_div:
+            location_text = location_div.text.strip()
+        
+        # Extract salary
+        salary_h2 = job_element.find('h2', class_='mosaic-provider-jobcards-4n9q2y')
+        if salary_h2:
+            salary = salary_h2.text.strip()
+            salary_span = job_element.find('span', class_='mosaic-provider-jobcards-140tz9m')
+            if salary_span:
+                salary += ' ' + salary_span.text.strip()
+        
+        # Extract job URL
+        link_a = job_element.find('a', class_='jcs-JobTitle')
+        if link_a and link_a.get('href'):
+            href = link_a.get('href')
+            if href.startswith('/'):
+                job_url = "https://www.indeed.com" + href
+            else:
+                job_url = href
+        
+        return {
+            'title': title,
+            'company': company,
+            'location': location_text,
+            'salary': salary,
+            'url': job_url,
+            'keyword': keyword,
+            'search_location': location
+        }
 
 class LinkedIn(Website):
     def __init__(self):

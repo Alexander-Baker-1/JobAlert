@@ -76,13 +76,15 @@ locations = [
 def main():
     indeed = Indeed()
     
-    for keyword in keywords:
-        for location in locations:
-            print(f"Searching for '{keyword}' in '{location}'")
-            jobs = indeed.search(keyword, location)
-            time.sleep(2)  # Wait 2 seconds between searches
-            # Process the jobs...
-    
+    print(f"Searching for intern in Denver, CO")
+    jobs = indeed.search("intern", "Denver, CO")
+
+    # for keyword in keywords:
+    #     for location in locations:
+    #         print(f"Searching for '{keyword}' in '{location}'")
+    #         jobs = indeed.search(keyword, location)
+    #         time.sleep(2)  # Wait 2 seconds between searches
+    #         # Process the jobs...
 
 if __name__ == "__main__":
     main()
