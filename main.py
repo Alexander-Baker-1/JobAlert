@@ -1,15 +1,7 @@
-import requests
-from bs4 import BeautifulSoup
+from websites import Indeed, LinkedIn
+import time
 
-url = 'https://www.indeed.com'
-headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Charset': 'utf-8',
-            'Upgrade-Insecure-Requests': '1',
-          }
-
+# Configuration data
 keywords = [
     "software engineering intern summer 2026",
     "software developer intern summer 2026", 
@@ -76,28 +68,21 @@ locations = [
     "Westminster, CO",
     
     # Broader searches
-    "Denver Metro Area, CO"
+    "Denver Metro Area, CO",
     "San Francisco Bay Area, CA",
 ]
 
-params = {
-    'q': 'intern',
-    'l': 'San Mateo, CA'
-}
+# Main execution
+def main():
+    indeed = Indeed()
+    
+    for keyword in keywords:
+        for location in locations:
+            print(f"Searching for '{keyword}' in '{location}'")
+            jobs = indeed.search(keyword, location)
+            time.sleep(2)  # Wait 2 seconds between searches
+            # Process the jobs...
+    
 
-response = requests.get(url, params=params, headers=headers)
-
-print(response.status_code)
-
-soup = BeautifulSoup(response.content, 'html.parser')
-
-print(soup.prettify())
-
-# print(soup.prettify())
-
-# content_div = soup.find('div', class_='article--viewer_content')
-# if content_div:
-#     for para in content_div.find_all('p'):
-#         print(para.text.strip())
-# else:
-#     print("No article content found.")
+if __name__ == "__main__":
+    main()
