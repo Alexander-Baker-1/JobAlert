@@ -75,9 +75,10 @@ locations = [
 # Main execution
 def main():
     indeed = Indeed()
-    
+
     print(f"Searching for intern in Denver, CO")
     jobs = indeed.search("intern", "Denver, CO")
+    print(jobs)
 
     # for keyword in keywords:
     #     for location in locations:

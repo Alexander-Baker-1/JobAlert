@@ -1,6 +1,7 @@
 import requests
 import time
 from bs4 import BeautifulSoup
+from job import Job
 
 class Website:
     def __init__(self):
@@ -36,7 +37,7 @@ class Indeed(Website):
         time.sleep(2)
         params = {'q': keyword, 'l': location}
         response = requests.get(self.base_url, params=params, headers=self.headers)
-        
+        print(response.status_code)
         soup = BeautifulSoup(response.content, 'html.parser')
         jobs = soup.find_all('div', class_='job_seen_beacon')
         
@@ -87,15 +88,15 @@ class Indeed(Website):
             else:
                 job_url = href
         
-        return {
-            'title': title,
-            'company': company,
-            'location': location_text,
-            'salary': salary,
-            'url': job_url,
-            'keyword': keyword,
-            'search_location': location
-        }
+        return Job(
+            title=title,
+            company=company,
+            location=location_text,
+            salary=salary,
+            url=job_url,
+            keyword=keyword,
+            search_location=location
+        )
 
 class LinkedIn(Website):
     def __init__(self):
