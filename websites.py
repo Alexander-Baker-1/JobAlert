@@ -98,5 +98,54 @@ class LinkedIn(Website):
         self.base_url = "https://www.linkedin.com/jobs/search"
     
     def search(self, keyword, location):
-        # LinkedIn implementation
-        pass
+        time.sleep(3)  # LinkedIn is stricter, use longer delay
+        params = {
+            'keywords': keyword,
+            'location': location,
+            'f_TPR': 'r86400'  # Only jobs posted in last 24 hours
+        }
+        response = self.make_request(self.base_url, params=params)
+        print(response.status_code)
+        
+        soup = BeautifulSoup(response.content, 'html.parser')
+        jobs = soup.find_all('div', class_='base-card')
+        
+        job_listings = []
+        for job in jobs:
+            job_data = self.parse_job(job, keyword, location)
+            job_listings.append(job_data)
+        
+        return job_listings
+    
+    def parse_job(self, job_element, keyword, location):
+        # Extract job title
+        title_a = job_element.find('a', class_='base-card__full-link')
+        title = title_a.get_text(strip=True) if title_a else 'No title'
+        
+        # Extract company
+        company_a = job_element.find('a', {'data-tracking-control-name': 'public_jobs_jserp-result_job-search-card-subtitle'})
+        company = company_a.get_text(strip=True) if company_a else 'No company'
+        
+        # Extract location
+        location_span = job_element.find('span', class_='job-search-card__location')
+        location_text = location_span.get_text(strip=True) if location_span else 'No location'
+        
+        # Extract job URL
+        job_url = self._get_job_url(job_element)
+        
+        return Job(
+            title=title,
+            company=company,
+            location=location_text,
+            salary='No salary listed',  # LinkedIn doesn't show salary in search results
+            url=job_url,
+            keyword=keyword,
+            search_location=location
+        )
+    
+    def _get_job_url(self, job_element):
+        link_a = job_element.find('a', class_='base-card__full-link')
+        if link_a and link_a.get('href'):
+            href = link_a.get('href')
+            return href
+        return 'No URL'
