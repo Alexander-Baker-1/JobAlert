@@ -1,7 +1,7 @@
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from database import JobDatabase
 
 class JobWebHandler(BaseHTTPRequestHandler):
@@ -14,17 +14,27 @@ class JobWebHandler(BaseHTTPRequestHandler):
             self.serve_jobs_api()
         elif path == '/api/stats':
             self.serve_stats_api()
+        elif path == '/api/status-counts':
+            self.serve_status_counts_api()
+        else:
+            self.send_error(404)
+    
+    def do_POST(self):
+        path = urlparse(self.path).path
+        
+        if path == '/api/update-status':
+            self.update_job_status()
         else:
             self.send_error(404)
     
     def serve_html(self):
-        """Serve the main HTML page"""
+        """Serve the main HTML page with job tracking"""
         html_content = """<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Live Job Listings</title>
+    <title>Job Application Tracker</title>
     <style>
         * {
             margin: 0;
@@ -40,7 +50,7 @@ class JobWebHandler(BaseHTTPRequestHandler):
         }
 
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
         }
 
@@ -56,25 +66,52 @@ class JobWebHandler(BaseHTTPRequestHandler):
             text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
         }
 
-        .refresh-btn {
-            background: rgba(255,255,255,0.2);
-            color: white;
-            border: 1px solid rgba(255,255,255,0.3);
-            padding: 10px 20px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin: 10px;
-            transition: background 0.3s;
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
-        .refresh-btn:hover {
+        .tab {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .tab:hover {
             background: rgba(255,255,255,0.3);
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-count {
+            background: rgba(255,255,255,0.3);
+            border-radius: 12px;
+            padding: 2px 8px;
+            margin-left: 8px;
+            font-size: 0.8rem;
+        }
+
+        .tab.active .tab-count {
+            background: #667eea;
+            color: white;
         }
 
         .stats {
             display: flex;
             justify-content: center;
-            gap: 30px;
+            gap: 20px;
             margin-bottom: 30px;
             flex-wrap: wrap;
         }
@@ -88,11 +125,11 @@ class JobWebHandler(BaseHTTPRequestHandler):
             padding: 20px;
             text-align: center;
             color: white;
-            min-width: 150px;
+            min-width: 120px;
         }
 
         .stat-number {
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: bold;
             margin-bottom: 5px;
         }
@@ -158,10 +195,11 @@ class JobWebHandler(BaseHTTPRequestHandler):
         .job-actions {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
 
         .btn {
-            padding: 10px 20px;
+            padding: 8px 16px;
             border: none;
             border-radius: 8px;
             font-weight: 600;
@@ -170,6 +208,7 @@ class JobWebHandler(BaseHTTPRequestHandler):
             text-decoration: none;
             display: inline-block;
             text-align: center;
+            font-size: 0.85rem;
         }
 
         .btn-primary {
@@ -177,9 +216,45 @@ class JobWebHandler(BaseHTTPRequestHandler):
             color: white;
         }
 
-        .btn-primary:hover {
-            background: #5a6fd8;
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #a0aec0;
+            color: white;
+        }
+
+        .btn:hover {
             transform: translateY(-1px);
+            opacity: 0.9;
+        }
+
+        .notes-section {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #e2e8f0;
+        }
+
+        .notes-textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 5px;
+            resize: vertical;
+            min-height: 60px;
+            font-size: 0.9rem;
         }
 
         .loading {
@@ -205,32 +280,51 @@ class JobWebHandler(BaseHTTPRequestHandler):
                 flex-direction: column;
                 align-items: center;
             }
+            
+            .tabs {
+                flex-direction: column;
+                align-items: center;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>Live Job Listings Dashboard</h1>
-            <p>Real-time data from your database</p>
-            <button class="refresh-btn" onclick="loadJobs()">🔄 Refresh</button>
+            <h1>Job Application Tracker</h1>
+            <p>Organize and track your job applications</p>
         </div>
 
         <div class="last-updated">
             Last updated: <span id="lastUpdated">Loading...</span>
         </div>
 
+        <div class="tabs">
+            <button class="tab active" data-status="new">
+                New Jobs <span class="tab-count" id="newCount">0</span>
+            </button>
+            <button class="tab" data-status="in_progress">
+                In Progress <span class="tab-count" id="inProgressCount">0</span>
+            </button>
+            <button class="tab" data-status="applied">
+                Applied <span class="tab-count" id="appliedCount">0</span>
+            </button>
+            <button class="tab" data-status="not_interested">
+                Not Interested <span class="tab-count" id="notInterestedCount">0</span>
+            </button>
+        </div>
+
         <div class="stats">
             <div class="stat-card">
-                <div class="stat-number" id="totalJobs">-</div>
+                <div class="stat-number" id="totalJobs">0</div>
                 <div>Total Jobs</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="uniqueCompanies">-</div>
+                <div class="stat-number" id="uniqueCompanies">0</div>
                 <div>Companies</div>
             </div>
             <div class="stat-card">
-                <div class="stat-number" id="uniqueLocations">-</div>
+                <div class="stat-number" id="uniqueLocations">0</div>
                 <div>Locations</div>
             </div>
         </div>
@@ -241,18 +335,19 @@ class JobWebHandler(BaseHTTPRequestHandler):
     </div>
 
     <script>
-        async function loadJobs() {
+        let currentStatus = 'new';
+        
+        async function loadJobs(status = 'new') {
             try {
-                const response = await fetch('/api/jobs');
+                const response = await fetch(`/api/jobs?status=${status}`);
                 const jobs = await response.json();
                 
-                renderJobs(jobs);
+                renderJobs(jobs, status);
                 updateLastUpdated();
-                loadStats();
             } catch (error) {
                 console.error('Error loading jobs:', error);
                 document.getElementById('jobsContainer').innerHTML = 
-                    '<div class="loading">Error loading jobs. Make sure your scraper has run!</div>';
+                    '<div class="loading">Error loading jobs.</div>';
             }
         }
 
@@ -269,11 +364,25 @@ class JobWebHandler(BaseHTTPRequestHandler):
             }
         }
 
-        function renderJobs(jobs) {
+        async function loadStatusCounts() {
+            try {
+                const response = await fetch('/api/status-counts');
+                const counts = await response.json();
+                
+                document.getElementById('newCount').textContent = counts.new || 0;
+                document.getElementById('inProgressCount').textContent = counts.in_progress || 0;
+                document.getElementById('appliedCount').textContent = counts.applied || 0;
+                document.getElementById('notInterestedCount').textContent = counts.not_interested || 0;
+            } catch (error) {
+                console.error('Error loading status counts:', error);
+            }
+        }
+
+        function renderJobs(jobs, status) {
             const container = document.getElementById('jobsContainer');
             
             if (jobs.length === 0) {
-                container.innerHTML = '<div class="loading">No jobs found. Run your scraper first!</div>';
+                container.innerHTML = `<div class="loading">No ${status.replace('_', ' ')} jobs found.</div>`;
                 return;
             }
             
@@ -283,11 +392,83 @@ class JobWebHandler(BaseHTTPRequestHandler):
                     <div class="job-company">${job.company}</div>
                     <div class="job-location">${job.location}</div>
                     <div class="job-salary">${job.salary || 'No salary listed'}</div>
+                    
                     <div class="job-actions">
                         <a href="${job.url || '#'}" class="btn btn-primary" target="_blank">View Job</a>
+                        ${getStatusButtons(job.id, job.status)}
+                    </div>
+                    
+                    <div class="notes-section">
+                        <textarea class="notes-textarea" placeholder="Add notes..." 
+                                  onchange="updateNotes(${job.id}, this.value)">${job.notes || ''}</textarea>
                     </div>
                 </div>
             `).join('');
+        }
+
+        function getStatusButtons(jobId, currentStatus) {
+            const buttons = [];
+            
+            if (currentStatus !== 'in_progress') {
+                buttons.push(`<button class="btn btn-warning" onclick="updateJobStatus(${jobId}, 'in_progress')">Mark In Progress</button>`);
+            }
+            
+            if (currentStatus !== 'applied') {
+                buttons.push(`<button class="btn btn-success" onclick="updateJobStatus(${jobId}, 'applied')">Mark Applied</button>`);
+            }
+            
+            if (currentStatus !== 'not_interested') {
+                buttons.push(`<button class="btn btn-danger" onclick="updateJobStatus(${jobId}, 'not_interested')">Not Interested</button>`);
+            }
+            
+            if (currentStatus !== 'new') {
+                buttons.push(`<button class="btn btn-secondary" onclick="updateJobStatus(${jobId}, 'new')">Mark as New</button>`);
+            }
+            
+            return buttons.join('');
+        }
+
+        async function updateJobStatus(jobId, newStatus) {
+            try {
+                const response = await fetch('/api/update-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        job_id: jobId,
+                        status: newStatus
+                    })
+                });
+                
+                if (response.ok) {
+                    // Reload current view and update counts
+                    loadJobs(currentStatus);
+                    loadStatusCounts();
+                } else {
+                    alert('Failed to update job status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                alert('Error updating job status');
+            }
+        }
+
+        async function updateNotes(jobId, notes) {
+            try {
+                await fetch('/api/update-status', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        job_id: jobId,
+                        notes: notes
+                    })
+                });
+            } catch (error) {
+                console.error('Error updating notes:', error);
+            }
         }
 
         function updateLastUpdated() {
@@ -295,11 +476,29 @@ class JobWebHandler(BaseHTTPRequestHandler):
             document.getElementById('lastUpdated').textContent = now.toLocaleString();
         }
 
-        // Auto-refresh every 30 seconds
-        setInterval(loadJobs, 30000);
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // Load jobs for selected status
+                currentStatus = tab.dataset.status;
+                loadJobs(currentStatus);
+            });
+        });
+
+        // Auto-refresh every 60 seconds
+        setInterval(() => {
+            loadJobs(currentStatus);
+            loadStatusCounts();
+        }, 60000);
 
         // Load initial data
-        loadJobs();
+        loadJobs('new');
+        loadStats();
+        loadStatusCounts();
     </script>
 </body>
 </html>"""
@@ -310,26 +509,19 @@ class JobWebHandler(BaseHTTPRequestHandler):
         self.wfile.write(html_content.encode())
     
     def serve_jobs_api(self):
-        """Serve jobs data as JSON API"""
+        """Serve jobs data as JSON API with status filtering"""
         try:
-            db = JobDatabase("data/jobs.db")
-            jobs = db.get_all_jobs()
+            query_params = parse_qs(urlparse(self.path).query)
+            status = query_params.get('status', ['new'])[0]
             
-            jobs_data = []
-            for job in jobs:
-                jobs_data.append({
-                    'title': job.title,
-                    'company': job.company,
-                    'location': job.location,
-                    'salary': job.salary,
-                    'url': job.url
-                })
+            db = JobDatabase("data/jobs.db")
+            jobs = db.get_jobs_by_status(status)
             
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
             self.end_headers()
-            self.wfile.write(json.dumps(jobs_data).encode())
+            self.wfile.write(json.dumps(jobs).encode())
             
         except Exception as e:
             self.send_response(500)
@@ -354,15 +546,72 @@ class JobWebHandler(BaseHTTPRequestHandler):
             self.send_header('Content-type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({'error': str(e)}).encode())
+    
+    def serve_status_counts_api(self):
+        """Serve status counts as JSON API"""
+        try:
+            db = JobDatabase("data/jobs.db")
+            counts = db.get_status_counts()
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps(counts).encode())
+            
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': str(e)}).encode())
+    
+    def update_job_status(self):
+        """Update job status via POST request"""
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data.decode('utf-8'))
+            
+            job_id = data.get('job_id')
+            new_status = data.get('status')
+            notes = data.get('notes')
+            
+            db = JobDatabase("data/jobs.db")
+            
+            if new_status:
+                success = db.update_job_status(job_id, new_status, notes)
+            else:
+                # Just updating notes
+                success = db.update_job_status(job_id, None, notes)
+            
+            if success:
+                self.send_response(200)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'success': True}).encode())
+            else:
+                self.send_response(404)
+                self.send_header('Content-type', 'application/json')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.end_headers()
+                self.wfile.write(json.dumps({'error': 'Job not found'}).encode())
+                
+        except Exception as e:
+            self.send_response(500)
+            self.send_header('Content-type', 'application/json')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.end_headers()
+            self.wfile.write(json.dumps({'error': str(e)}).encode())
 
 def start_server(port=8000):
     """Start the web server"""
     server_address = ('', port)
     httpd = HTTPServer(server_address, JobWebHandler)
     
-    print(f"Job listings server starting on http://localhost:{port}")
+    print(f"Job tracker server starting on http://localhost:{port}")
     print(f"View your jobs at: http://localhost:{port}")
-    print(f"Data updates automatically from your database")
+    print(f"Track application progress with multiple status pages")
     print(f"Press Ctrl+C to stop the server")
     
     try:
