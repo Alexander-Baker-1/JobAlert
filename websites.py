@@ -130,6 +130,9 @@ class LinkedIn(Website):
         location_span = job_element.find('span', class_='job-search-card__location')
         location_text = location_span.get_text(strip=True) if location_span else 'No location'
         
+        # Extract salary - USE THE METHOD INSTEAD OF HARDCODING
+        salary = self._get_salary(job_element)
+
         # Extract job URL
         job_url = self._get_job_url(job_element)
         
@@ -137,7 +140,7 @@ class LinkedIn(Website):
             title=title,
             company=company,
             location=location_text,
-            salary='No salary listed',  # LinkedIn doesn't show salary in search results
+            salary=salary,
             url=job_url,
             keyword=keyword,
             search_location=location
