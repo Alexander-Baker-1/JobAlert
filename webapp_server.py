@@ -10,6 +10,8 @@ class JobWebHandler(BaseHTTPRequestHandler):
         
         if path == '/' or path == '/index.html':
             self.serve_html()
+        elif path == '/favicon.ico' or path == '/favicon.png':
+            self.serve_favicon()
         elif path == '/api/jobs':
             self.serve_jobs_api()
         elif path == '/api/stats':
@@ -35,6 +37,7 @@ class JobWebHandler(BaseHTTPRequestHandler):
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Job Application Tracker</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
     <style>
         * {
             margin: 0;
@@ -508,6 +511,20 @@ class JobWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(html_content.encode())
     
+    def serve_favicon(self):
+        """Serve the favicon file"""
+        try:
+            with open('favicon.png', 'rb') as f:
+                content = f.read()
+            
+            self.send_response(200)
+            self.send_header('Content-type', 'image/png')
+            self.send_header('Content-length', len(content))
+            self.end_headers()
+            self.wfile.write(content)
+        except FileNotFoundError:
+            self.send_error(404)
+
     def serve_jobs_api(self):
         """Serve jobs data as JSON API with status filtering"""
         try:
