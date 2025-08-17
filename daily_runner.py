@@ -13,7 +13,7 @@ def run_daily_linkedin_scrape():
     db = JobDatabase("data/jobs.db")
     linkedin = LinkedIn()
     
-    # All your search terms from main.py
+    # All search terms
     keywords = [
         "software engineering intern summer 2026",
         "software developer intern summer 2026", 
@@ -70,7 +70,7 @@ def run_daily_linkedin_scrape():
         print(f"[{i}/{len(searches)}] {keyword} in {location}")
         
         try:
-            # This will only get jobs posted in the last 24 hours
+            # Only get new jobs
             jobs = linkedin.search(keyword, location)
             
             if jobs:
@@ -99,7 +99,7 @@ def start_daily_scheduler():
     print("Daily LinkedIn scraper scheduled for 9:00 AM")
     print("Scheduler running... Press Ctrl+C to stop")
     
-    # Run once now for testing
+    # Run once for testing
     print("Running test scrape now...")
     run_daily_linkedin_scrape()
     

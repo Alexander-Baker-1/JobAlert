@@ -7,10 +7,10 @@ def run_in_background():
     """Run the server in background without showing console window"""
     
     if len(sys.argv) > 1 and sys.argv[1] == "background":
-        # This runs the actual server
+        # Runs the actual server
         start_server(8000)
     else:
-        # This starts the background process
+        # Starts the background process
         python_exe = sys.executable
         script_path = os.path.abspath(__file__)
         

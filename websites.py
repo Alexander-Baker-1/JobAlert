@@ -98,7 +98,6 @@ class LinkedIn(Website):
         self.base_url = "https://www.linkedin.com/jobs/search"
     
     def search(self, keyword, location):
-        time.sleep(3)  # LinkedIn is stricter, use longer delay
         params = {
             'keywords': keyword,
             'location': location,

@@ -581,7 +581,7 @@ class JobWebHandler(BaseHTTPRequestHandler):
             if new_status:
                 success = db.update_job_status(job_id, new_status, notes)
             else:
-                # Just updating notes
+                # Update notes
                 success = db.update_job_status(job_id, None, notes)
             
             if success:
