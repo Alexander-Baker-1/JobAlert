@@ -74,13 +74,24 @@ class Indeed(Website):
         )
     
     def _get_salary(self, job_element):
-        salary_h2 = job_element.find('h2', class_='mosaic-provider-jobcards-4n9q2y')
-        if salary_h2:
-            salary = salary_h2.text.strip()
-            salary_span = job_element.find('span', class_='mosaic-provider-jobcards-140tz9m')
-            if salary_span:
-                salary += ' ' + salary_span.text.strip()
-            return salary
+        # Try common Indeed salary selectors
+        salary_span = job_element.find('span', class_='job-search-card__salary-info')
+        if salary_span:
+            return salary_span.get_text(strip=True)
+        
+        # Alternative Indeed selector
+        salary_div = job_element.find('div', class_='result-benefits__text')
+        if salary_div:
+            return salary_div.get_text(strip=True)
+        
+        # Search for salary keywords in any text
+        for element in job_element.find_all(text=True):
+            text = element.strip().lower()
+            if any(keyword in text for keyword in ['$', '/hr', '/year', 'salary', 'k-', 'k ']):
+                parent_text = element.parent.get_text(strip=True) if element.parent else element
+                if len(parent_text) < 50:  # Keep it short
+                    return parent_text
+        
         return 'No salary listed'
     
     def _get_job_url(self, job_element):
@@ -144,6 +155,27 @@ class LinkedIn(Website):
             keyword=keyword,
             search_location=location
         )
+    
+    def _get_salary(self, job_element):
+        # Try common LinkedIn salary selectors
+        salary_span = job_element.find('span', class_='job-search-card__salary-info')
+        if salary_span:
+            return salary_span.get_text(strip=True)
+        
+        # Alternative LinkedIn selector
+        salary_div = job_element.find('div', class_='result-benefits__text')
+        if salary_div:
+            return salary_div.get_text(strip=True)
+        
+        # Search for salary keywords in any text
+        for element in job_element.find_all(text=True):
+            text = element.strip().lower()
+            if any(keyword in text for keyword in ['$', '/hr', '/year', 'salary', 'k-', 'k ']):
+                parent_text = element.parent.get_text(strip=True) if element.parent else element
+                if len(parent_text) < 50:  # Keep it short
+                    return parent_text
+        
+        return 'No salary listed'
     
     def _get_job_url(self, job_element):
         link_a = job_element.find('a', class_='base-card__full-link')
