@@ -111,28 +111,38 @@ class JobDatabase:
         
         return jobs
     
-    def update_job_status(self, job_id, new_status, notes=None):
-        """Update a job's status"""
+    def update_job_status(self, job_id, new_status=None, notes=None):
+        """Update a job's status and/or notes"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        if notes is not None:
-            cursor.execute('''
-                UPDATE jobs 
-                SET status = ?, status_updated = ?, notes = ?
-                WHERE id = ?
-            ''', (new_status, datetime.now(), notes, job_id))
-        else:
-            cursor.execute('''
-                UPDATE jobs 
-                SET status = ?, status_updated = ?
-                WHERE id = ?
-            ''', (new_status, datetime.now(), job_id))
+        # Build the update query based on what needs updating
+        updates = []
+        params = []
         
+        if new_status is not None:
+            updates.append("status = ?")
+            params.append(new_status)
+            updates.append("status_updated = ?")
+            params.append(datetime.now())
+        
+        if notes is not None:
+            updates.append("notes = ?")
+            params.append(notes)
+        
+        if not updates:
+            conn.close()
+            return False  # Nothing to update
+        
+        query = f"UPDATE jobs SET {', '.join(updates)} WHERE id = ?"
+        params.append(job_id)
+        
+        cursor.execute(query, params)
         conn.commit()
+        rowcount = cursor.rowcount
         conn.close()
         
-        return cursor.rowcount > 0
+        return rowcount > 0
     
     def get_all_jobs(self):
         """Get all jobs (for backward compatibility)"""
